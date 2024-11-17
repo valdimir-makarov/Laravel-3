@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # Webserver service configuration (PHP with Apache)
+  webserver:
+    image: php:8.2-apache
+    container_name: webserver
+    ports:
+      - "8005:80"
+    volumes:
+      - ./laravel:/var/www/html  # Mount your Laravel directory here
+      - ./laravel/storage:/var/www/html/storage  # Mount storage folder to avoid permission issues
+      - ./apache-config/apache2.conf:/etc/apache2/apache2.conf  # Mount custom Apache config
+    depends_on:
+      - db  # Ensure db is available before webserver starts
+    environment:
+      DB_HOST: db  # Point to the db service (db)
+
+  # Database service configuration (MySQL)
+  db:
+    image: mysql:8
+    container_name: db
+    environment:
+      MYSQL_ROOT_PASSWORD: mysecret
+      MYSQL_DATABASE: laravel_db
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    volumes:
+      - db_data:/var/lib/mysql  # Persistent volume for MySQL data
+    ports:
+      - "3307:3306"  # Expose MySQL port for external access if needed
+
+  # PhpMyAdmin service configuration
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: phpmyadmin
+    depends_on:
+      - db  # Ensure db is available before phpMyAdmin starts
+    ports:
+      - "8001:80"  # Expose PhpMyAdmin on port 8001
+    environment:
+      - PMA_ARBITRARY=1
+      - PMA_HOST=db  # Set MySQL host to the db service
+      - MYSQL_ROOT_PASSWORD=mysecret  # Use root password for MySQL
+
+  # Nginx service configuration
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    ports:
+      - "8000:80"
+    volumes:
+      - ./laravel:/var/www/html
+      - ./nginx.conf:/etc/nginx/nginx.conf  # Ensure this file exists and is correct
+    depends_on:
+      - webserver
+    networks:
+      - laravel_network
+
+# Define a named volume for MySQL data storage
+volumes:
+  db_data:
+
+networks:
+  laravel_network:
+    driver: bridge
